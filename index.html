@@ -2,20 +2,21 @@
 <html lang="sv">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snake Spel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"> <title>Snake Spel</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         body {
             display: flex;
-            justify-content: center;
-            align-items: center;
+            justify-content: center; /* Centrera horisontellt */
+            align-items: center; /* Centrera vertikalt */
             min-height: 100vh;
             background-color: #222; /* Mörk bakgrund */
             margin: 0;
             font-family: 'Press Start 2P', cursive; /* Arkadfont */
             color: #fff; /* Vit text */
-            flex-direction: column; /* Centrera vertikalt */
+            flex-direction: column; /* Stapla element vertikalt */
+            padding: 10px; /* Lite marginal runt om */
+            box-sizing: border-box;
         }
 
         #game-container {
@@ -25,21 +26,25 @@
             position: relative; /* För meddelanderutan */
             border-radius: 8px; /* Rundade hörn */
             overflow: hidden; /* Gömmer overflow */
-            width: 400px; /* Fast bredd */
-            height: 400px; /* Fast höjd */
+            /* Gör canvas responsiv upp till max 400px */
+            width: 100%;
+            max-width: 400px; /* Max bredd */
+            aspect-ratio: 1 / 1; /* Behåll kvadratisk form */
         }
 
         canvas {
             display: block; /* Tar bort extra utrymme under canvas */
             width: 100%; /* Fyll container */
             height: 100%; /* Fyll container */
+            image-rendering: pixelated; /* Behåll pixel-looken vid skalning */
         }
 
         #score {
-            margin-top: 20px;
-            font-size: 1.5em;
+            margin-top: 15px; /* Lite mindre marginal */
+            font-size: 1.2em; /* Något mindre text för mobil */
             color: #0f0; /* Grön poängtext */
             text-shadow: 0 0 5px #0f0; /* Ljusgrön skugga */
+            text-align: center;
         }
 
         #message-box {
@@ -49,21 +54,22 @@
             transform: translate(-50%, -50%);
             background-color: rgba(50, 50, 50, 0.85); /* Halvtransparent grå */
             color: #fff;
-            padding: 30px;
+            padding: 20px; /* Mindre padding */
             border-radius: 10px;
             text-align: center;
-            font-size: 1.2em;
+            font-size: 1em; /* Mindre text */
             display: none; /* Dold som standard */
             border: 2px solid #fff;
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
             z-index: 10; /* Säkerställer att den är över canvas */
+            width: 80%; /* Relativ bredd */
         }
 
         #message-box button {
-            margin-top: 20px;
-            padding: 10px 20px;
+            margin-top: 15px;
+            padding: 10px 15px;
             font-family: 'Press Start 2P', cursive;
-            font-size: 1em;
+            font-size: 0.9em;
             cursor: pointer;
             background-color: #0f0; /* Grön knapp */
             color: #000; /* Svart text */
@@ -78,17 +84,65 @@
             box-shadow: 0 2px #080; /* Mindre skugga */
             transform: translateY(2px); /* Flytta ner knappen lite */
         }
+
+        /* NYTT: Styling för touch-kontroller */
+        #touch-controls {
+            margin-top: 15px;
+            display: grid; /* Använd grid för layout */
+            grid-template-columns: repeat(3, 1fr); /* Tre kolumner */
+            grid-template-rows: repeat(2, 1fr);    /* Två rader */
+            gap: 10px; /* Mellanrum mellan knappar */
+            width: 100%;
+            max-width: 250px; /* Begränsa bredden på kontrollerna */
+        }
+
+        #touch-controls button {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1.5em; /* Större pilar */
+            padding: 15px; /* Bra tryckyta */
+            background-color: #444; /* Mörkgrå knappar */
+            color: #fff;
+            border: 2px solid #666;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px #222;
+            transition: background-color 0.1s, box-shadow 0.1s, transform 0.1s;
+            user-select: none; /* Förhindra textmarkering vid tryck */
+            -webkit-user-select: none; /* Safari */
+            -moz-user-select: none; /* Firefox */
+            -ms-user-select: none; /* IE/Edge */
+            touch-action: manipulation; /* Förbättrar respons på touch */
+        }
+
+        #touch-controls button:active {
+            background-color: #555;
+            box-shadow: 0 2px #111;
+            transform: translateY(2px);
+        }
+
+        /* Placering av knappar i grid */
+        #btn-up { grid-column: 2; grid-row: 1; }
+        #btn-left { grid-column: 1; grid-row: 2; }
+        #btn-down { grid-column: 2; grid-row: 2; }
+        #btn-right { grid-column: 3; grid-row: 2; }
+
     </style>
 </head>
 <body>
     <div id="game-container">
-        <canvas id="gameCanvas" width="400" height="400"></canvas>
-        <div id="message-box">
+        <canvas id="gameCanvas"></canvas> <div id="message-box">
             <p id="message-text"></p>
             <button id="start-button">Starta</button>
         </div>
     </div>
     <div id="score">Poäng: 0</div>
+
+    <div id="touch-controls">
+        <button id="btn-up">▲</button>
+        <button id="btn-left">◀</button>
+        <button id="btn-down">▼</button>
+        <button id="btn-right">▶</button>
+    </div>
 
     <script>
         // Hämta nödvändiga DOM-element
@@ -98,11 +152,16 @@
         const messageBox = document.getElementById('message-box');
         const messageText = document.getElementById('message-text');
         const startButton = document.getElementById('start-button');
+        // NYTT: Hämta touch-knappar
+        const btnUp = document.getElementById('btn-up');
+        const btnLeft = document.getElementById('btn-left');
+        const btnDown = document.getElementById('btn-down');
+        const btnRight = document.getElementById('btn-right');
 
         // Spelkonstanter och variabler
-        const gridSize = 20; // Storlek på varje ruta i rutnätet (pixels)
-        const canvasSize = 400; // Canvas storlek (måste matcha HTML width/height)
-        const tileCount = canvasSize / gridSize; // Antal rutor på bredden/höjden
+        let gridSize = 20; // Startvärde, justeras dynamiskt
+        let canvasSize = 400; // Startvärde, justeras dynamiskt
+        let tileCount = canvasSize / gridSize; // Beräknas dynamiskt
         const gameSpeed = 150; // Hastighet i millisekunder (lägre är snabbare)
 
         let snake = []; // Ormens kroppsdelar (array av {x, y})
@@ -116,47 +175,61 @@
 
         // --- Funktioner ---
 
+        // NYTT: Funktion för att justera canvasstorlek och rutnät
+        function resizeGame() {
+            const container = document.getElementById('game-container');
+            // Sätt canvas storlek till containerns faktiska storlek
+            canvasSize = container.clientWidth;
+            canvas.width = canvasSize;
+            canvas.height = canvasSize;
+
+            // Behåll ungefär samma antal rutor (t.ex. 20x20)
+            tileCount = 20;
+            gridSize = canvasSize / tileCount;
+
+            // Återställ spelet om det inte körs, annars rita om
+            if (!gameRunning) {
+                 resetGame(); // Rita om startläget med ny storlek
+            } else {
+                // Rita om elementen med ny storlek under spelets gång
+                clearCanvas();
+                drawFood();
+                drawSnake();
+            }
+        }
+
         // Ritar en rektangel (används för ormsegment och mat)
         function drawRect(x, y, color) {
             ctx.fillStyle = color;
-            // x * gridSize och y * gridSize omvandlar rutnätskoordinater till pixelkoordinater
-            // gridSize - 2 skapar ett litet mellanrum mellan rutorna för visuell tydlighet
-            ctx.fillRect(x * gridSize, y * gridSize, gridSize - 2, gridSize - 2);
+            // Använder nu dynamisk gridSize
+            ctx.fillRect(x * gridSize, y * gridSize, gridSize - 1, gridSize - 1); // -1 för litet mellanrum
         }
 
         // Ritar hela ormen
         function drawSnake() {
-            // Loopar igenom varje segment i 'snake'-arrayen
             snake.forEach((part, index) => {
-                // Huvudet (index 0) får en ljusare färg än kroppen
-                // ÄNDRING: Ändrat färger till orange
-                const color = index === 0 ? '#ff9900' : '#cc6600'; // Ljusorange huvud, mörkare orange kropp
+                const color = index === 0 ? '#ff9900' : '#cc6600'; // Orange
                 drawRect(part.x, part.y, color);
             });
         }
 
         // Ritar maten
         function drawFood() {
-             // ÄNDRING: Ändrat färg till grön
             drawRect(food.x, food.y, '#00ff00'); // Grön mat
         }
 
         // Flyttar ormen ett steg i aktuell riktning (dx, dy)
         function moveSnake() {
-            // Beräkna positionen för det nya huvudet
+            if (!snake.length) return; // Säkerhetskoll om ormen är tom
             const head = { x: snake[0].x + dx, y: snake[0].y + dy };
-            // Lägg till det nya huvudet i början av 'snake'-arrayen
             snake.unshift(head);
 
-            // Kolla om ormen precis åt maten
             const ateFood = snake[0].x === food.x && snake[0].y === food.y;
             if (ateFood) {
-                score += 10; // Öka poängen
-                scoreElement.textContent = `Poäng: ${score}`; // Uppdatera poängvisningen
-                placeFood(); // Placera ut ny mat på brädet
+                score += 10;
+                scoreElement.textContent = `Poäng: ${score}`;
+                placeFood();
             } else {
-                // Om ingen mat åts, ta bort det sista segmentet från ormens svans
-                // Detta får ormen att se ut som den rör sig framåt
                 snake.pop();
             }
         }
@@ -164,82 +237,85 @@
         // Placerar mat slumpmässigt på en ledig ruta
         function placeFood() {
             let newFoodPosition;
-            // Loopa tills en position hittas som *inte* är upptagen av ormen
             do {
                 newFoodPosition = {
-                    x: Math.floor(Math.random() * tileCount), // Slumpmässig x-koordinat inom rutnätet
-                    y: Math.floor(Math.random() * tileCount)  // Slumpmässig y-koordinat inom rutnätet
+                    x: Math.floor(Math.random() * tileCount),
+                    y: Math.floor(Math.random() * tileCount)
                 };
-            } while (isFoodOnSnake(newFoodPosition)); // Kolla om positionen är upptagen
+            } while (isFoodOnSnake(newFoodPosition));
 
-            food = newFoodPosition; // Uppdatera den globala matpositionen
+            food = newFoodPosition;
         }
 
         // Hjälpfunktion: Kollar om en given position är upptagen av något ormsegment
         function isFoodOnSnake(position) {
-            // Använder array.some() för att se om *något* segment matchar positionen
             return snake.some(part => part.x === position.x && part.y === position.y);
         }
 
-        // Hanterar tangenttryckningar för att styra ormen
-        function handleKeyPress(event) {
-            // Ignorera tangenttryck om spelet inte körs eller om vi redan håller på att byta riktning
-            if (!gameRunning || changingDirection) return;
-            changingDirection = true; // Sätt flaggan så vi inte kan byta igen direkt
+        // NYTT: Funktion för att hantera riktningsändring (från tangentbord eller touch)
+        function changeDirection(newDx, newDy) {
+             if (!gameRunning || changingDirection) return; // Ignorera om spelet inte körs eller riktning redan ändras
 
-            const keyPressed = event.key; // Hämta tangentens namn (t.ex. "ArrowUp")
-
-            // Hämta nuvarande riktning för att förhindra 180-graders svängar
             const goingUp = dy === -1;
             const goingDown = dy === 1;
             const goingLeft = dx === -1;
             const goingRight = dx === 1;
 
-            // Uppdatera dx och dy baserat på tangent, men bara om det inte är motsatt riktning
-            // Tillåter både piltangenter och WASD
-            if ((keyPressed === 'ArrowUp' || keyPressed.toLowerCase() === 'w') && !goingDown) {
-                dx = 0; dy = -1;
-            } else if ((keyPressed === 'ArrowDown' || keyPressed.toLowerCase() === 's') && !goingUp) {
-                dx = 0; dy = 1;
-            } else if ((keyPressed === 'ArrowLeft' || keyPressed.toLowerCase() === 'a') && !goingRight) {
-                dx = -1; dy = 0;
-            } else if ((keyPressed === 'ArrowRight' || keyPressed.toLowerCase() === 'd') && !goingLeft) {
-                dx = 1; dy = 0;
-            } else {
-                 // Om ingen giltig styrknapp trycktes, återställ flaggan direkt
-                 changingDirection = false;
+            // Förhindra 180-graders sväng
+            if (newDx === 1 && goingLeft) return;
+            if (newDx === -1 && goingRight) return;
+            if (newDy === 1 && goingUp) return;
+            if (newDy === -1 && goingDown) return;
+
+            // Sätt ny riktning och flagga
+            dx = newDx;
+            dy = newDy;
+            changingDirection = true;
+        }
+
+        // Hanterar tangenttryckningar för att styra ormen
+        function handleKeyPress(event) {
+            const keyPressed = event.key;
+
+            if (keyPressed === 'ArrowUp' || keyPressed.toLowerCase() === 'w') {
+                changeDirection(0, -1); // Upp
+            } else if (keyPressed === 'ArrowDown' || keyPressed.toLowerCase() === 's') {
+                changeDirection(0, 1); // Ner
+            } else if (keyPressed === 'ArrowLeft' || keyPressed.toLowerCase() === 'a') {
+                changeDirection(-1, 0); // Vänster
+            } else if (keyPressed === 'ArrowRight' || keyPressed.toLowerCase() === 'd') {
+                changeDirection(1, 0); // Höger
             }
         }
 
         // Kollar om ormens huvud har kolliderat med väggar eller sin egen kropp
         function checkCollision() {
+             if (!snake.length) return false; // Ingen kollision om ingen orm finns
             const head = snake[0];
 
-            // Väggkollision: Kolla om huvudet är utanför canvasens gränser
+            // Väggkollision
             if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
-                return true; // Kollision!
+                return true;
             }
 
-            // Självkollision: Kolla om huvudet är på samma ruta som något annat kroppssegment
-            // Loopar från index 1 (första kroppssegmentet) eftersom huvudet (index 0) inte kan kollidera med sig själv
+            // Självkollision
             for (let i = 1; i < snake.length; i++) {
                 if (head.x === snake[i].x && head.y === snake[i].y) {
-                    return true; // Kollision!
+                    return true;
                 }
             }
-
-            return false; // Ingen kollision
+            return false;
         }
 
         // Visar meddelanderutan med angiven text
         function showMessage(text) {
             messageText.textContent = text;
-            messageBox.style.display = 'block'; // Gör rutan synlig
+            messageBox.style.display = 'block';
         }
 
         // Döljer meddelanderutan
         function hideMessage() {
-            messageBox.style.display = 'none'; // Gör rutan osynlig
+            messageBox.style.display = 'none';
         }
 
         // Återställer spelets tillstånd till startläget
@@ -250,12 +326,12 @@
             ];
             dx = 0; // Ingen initial rörelse
             dy = 0;
-            score = 0; // Nollställ poängen
-            scoreElement.textContent = `Poäng: ${score}`; // Uppdatera poängvisningen
-            placeFood(); // Placera ut den första matbiten
+            score = 0;
+            scoreElement.textContent = `Poäng: ${score}`;
+            placeFood();
             changingDirection = false;
-            gameRunning = false; // Spelet är inte igång än
-            clearTimeout(gameLoopTimeout); // Stoppa eventuell tidigare spellop
+            gameRunning = false;
+            clearTimeout(gameLoopTimeout);
             // Rensa och rita startläget
             clearCanvas();
             drawSnake();
@@ -264,63 +340,71 @@
 
         // Rensa hela canvasen
         function clearCanvas() {
-            ctx.fillStyle = '#000'; // Svart bakgrundsfärg
-            ctx.fillRect(0, 0, canvasSize, canvasSize); // Fyll hela canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvasSize, canvasSize);
         }
 
         // Funktion som körs när spelet är över
         function gameOver() {
-            gameRunning = false; // Stoppa spelet
-            clearTimeout(gameLoopTimeout); // Stoppa spellopen
-            showMessage(`Game Over! Poäng: ${score}`); // Visa game over-meddelande
-            startButton.textContent = "Spela igen"; // Ändra knapptext
+            gameRunning = false;
+            clearTimeout(gameLoopTimeout);
+            showMessage(`Game Over! Poäng: ${score}`);
+            startButton.textContent = "Spela igen";
         }
 
         // Huvudspellopen - uppdaterar och ritar spelet
         function gameLoop() {
-            if (!gameRunning) return; // Avsluta om spelet inte körs
+            if (!gameRunning) return;
 
-            // Schemalägg nästa körning av gameLoop
-            // Detta skapar en återkommande loop med 'gameSpeed' intervall
             gameLoopTimeout = setTimeout(() => {
-                changingDirection = false; // Tillåt riktningsändring igen för nästa tick
+                changingDirection = false; // Tillåt riktningsändring igen
 
-                clearCanvas(); // Rensa canvasen före varje ny ritning
-                drawFood();    // Rita maten
-                moveSnake();   // Flytta ormen
-                drawSnake();   // Rita ormen på dess nya position
+                clearCanvas();
+                drawFood();
+                moveSnake();
+                drawSnake();
 
-                // Kolla efter kollision efter att ormen har flyttats
                 if (checkCollision()) {
-                    gameOver(); // Avsluta spelet om kollision upptäcks
+                    gameOver();
                 } else {
-                    gameLoop(); // Fortsätt loopen om ingen kollision
+                    gameLoop(); // Fortsätt loopen
                 }
             }, gameSpeed);
         }
 
          // Startar spelet när knappen klickas
          function startGame() {
-            hideMessage(); // Göm meddelanderutan
-            resetGame();   // Återställ spelet (även om det är första gången)
+            hideMessage();
+            // Återställ med aktuell storlek
+            resizeGame(); // Säkerställer rätt storlek vid start
+            resetGame(); // Nollställ position etc.
+
             dx = 1; // Starta med att röra sig åt höger
             dy = 0;
-            gameRunning = true; // Sätt spelet som körande
-            gameLoop(); // Starta spellopen
+            gameRunning = true;
+            gameLoop();
          }
 
         // --- Event Listeners ---
-        // Lyssna efter tangenttryckningar
+        // Tangentbord
         document.addEventListener('keydown', handleKeyPress);
-        // Lyssna efter klick på startknappen
+        // Startknapp
         startButton.addEventListener('click', startGame);
+        // NYTT: Touch-knappar (använder 'click' för enkelhet, fungerar oftast bra på mobil också)
+        btnUp.addEventListener('click', () => changeDirection(0, -1));
+        btnDown.addEventListener('click', () => changeDirection(0, 1));
+        btnLeft.addEventListener('click', () => changeDirection(-1, 0));
+        btnRight.addEventListener('click', () => changeDirection(1, 0));
+
+        // NYTT: Lyssna efter fönsterstorleksändringar
+        window.addEventListener('resize', resizeGame);
 
         // --- Initialisering ---
         // Körs när hela sidan har laddats
         window.onload = () => {
-            resetGame(); // Förbered spelet
-            showMessage("Tryck Start för att spela!"); // Visa startmeddelande
-            startButton.textContent = "Starta"; // Säkerställ rätt knapptext
+            resizeGame(); // Anpassa storlek direkt vid laddning
+            showMessage("Tryck Start för att spela!");
+            startButton.textContent = "Starta";
         };
 
     </script>
